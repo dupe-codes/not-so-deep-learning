@@ -1,5 +1,5 @@
 """
-    Giga simple "neural network" with one layer, two ReLU neurons.
+    Giga simple neural network with two linear layers and ReLU activation.
 
     Mirrors the fast.ai lecture 3 Titanic excel spreadsheet example.
 
