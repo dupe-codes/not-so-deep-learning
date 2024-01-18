@@ -16,9 +16,9 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
-import torch
-from torch import Generator, randn, tensor
-from torch.utils.data import DataLoader, RandomSampler, TensorDataset
+# import torch
+# from torch import Generator, randn, tensor
+# from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 
 TRAIN_DATA = 'resources/titanic/train.csv'
 
@@ -41,6 +41,22 @@ NUM_EPOCHS = 50
 
 def _transform_data(df):
     # Remove rows with any missing data
+    # print(df)
+
+    # Prefer brackets over dot notation access (df.Name)
+    # print(df["Name"])
+
+    # Print first few rows
+    print(df.head())
+    # Get summary statistics for data in the dataframe
+    print(df.describe())
+
+    print("info")
+    print(df.info())
+
+    print("\n\nisna")
+    print(df.isna())
+
     df = df.dropna(subset=RAW_FEATURES + ['Survived'])
     print('Data after dropping rows with missing data')
     print(df.shape)
@@ -58,7 +74,8 @@ def _transform_data(df):
         input_features=RAW_FEATURES)
     X = pd.DataFrame(X, columns=feature_names)
 
-    return tensor(X.values).float(), tensor(y)
+    return X, y
+    # return tensor(X.values).float(), tensor(y)
 
 
 def _mse_loss(y_pred, y_true):
@@ -108,27 +125,27 @@ def _train_epoch(params, lr, train_dl, valid_X, valid_y):
 
 
 def main():
-    train_df = pd.read_csv(TRAIN_DATA)
+    train_df = pd.read_csv(TRAIN_DATA, index_col='PassengerId')
     X, y = _transform_data(train_df)
 
     # learning note: jumping between pandas dataframes, numpy ndarrays, and torch tensors
     # is a bit messy/confusing
-    X_train, X_test, y_train, y_test = map(tensor, train_test_split(
-        X, y, test_size=0.2, random_state=RANDOM_SEED))
+    # X_train, X_test, y_train, y_test = map(tensor, train_test_split(
+        # X, y, test_size=0.2, random_state=RANDOM_SEED))
 
-    ds_train = TensorDataset(X_train, y_train)
-    sampler = RandomSampler(
-        ds_train, generator=Generator().manual_seed(RANDOM_SEED))
-    train_dl = DataLoader(ds_train, batch_size=BATCH_SIZE, sampler=sampler)
+    # ds_train = TensorDataset(X_train, y_train)
+    # sampler = RandomSampler(
+        # ds_train, generator=Generator().manual_seed(RANDOM_SEED))
+    # train_dl = DataLoader(ds_train, batch_size=BATCH_SIZE, sampler=sampler)
 
-    weights1 = _init_params((len(X_train[0]), NUM_HIDDEN_UNITS))
-    bias1 = _init_params(NUM_HIDDEN_UNITS)
-    weights2 = _init_params((NUM_HIDDEN_UNITS, 1))
-    bias2 = _init_params(1)
+    # weights1 = _init_params((len(X_train[0]), NUM_HIDDEN_UNITS))
+    # bias1 = _init_params(NUM_HIDDEN_UNITS)
+    # weights2 = _init_params((NUM_HIDDEN_UNITS, 1))
+    # bias2 = _init_params(1)
 
-    for _ in range(NUM_EPOCHS):
-        _train_epoch((weights1, bias1, weights2, bias2),
-                     LEARNING_RATE, train_dl, X_test, y_test)
+    # for _ in range(NUM_EPOCHS):
+        # _train_epoch((weights1, bias1, weights2, bias2),
+                     # LEARNING_RATE, train_dl, X_test, y_test)
 
 
 if __name__ == '__main__':
