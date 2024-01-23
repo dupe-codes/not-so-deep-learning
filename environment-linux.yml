@@ -1,0 +1,20 @@
+name: deep-learning-studies
+channels:
+  - conda-forge
+  - defaults
+  - pytorch
+dependencies:
+  - python
+  - poetry
+  - mamba
+  - ipykernel
+  - nb_conda_kernels
+  - jupyter
+  - pre-commit
+
+  # PyTorch GPU installs
+  - pytorch
+  - torchvision
+  - torchaudio
+  - cudatoolkit
+

@@ -12,31 +12,43 @@
 """
 
 import pandas as pd
+import numpy as np
 
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
-# import torch
-# from torch import Generator, randn, tensor
-# from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 
-TRAIN_DATA = 'resources/titanic/train.csv'
+import torch
+from torch import Generator, randn, tensor
+from torch.utils.data import DataLoader, RandomSampler, TensorDataset
+
+TRAIN_DATA = "resources/titanic/train.csv"
 
 RAW_FEATURES = [
-    'Pclass',
-    'Sex',
-    'Age',
-    'SibSp',
-    'Parch',
-    'Fare',
-    'Embarked',
+    "Pclass",
+    "Sex",
+    "Age",
+    "SibSp",
+    "Parch",
+    "Fare",
+    "Embarked",
+]
+
+MODEL_FEATURES = [
+    "Pclass",
+    "Sex",
+    "Age",
+    "SibSp",
+    "Parch",
+    "LogFare",
+    "Embarked",
 ]
 
 NUM_HIDDEN_UNITS = 100
 RANDOM_SEED = 42
 BATCH_SIZE = 40
-LEARNING_RATE = 0.001
-NUM_EPOCHS = 50
+LEARNING_RATE = 0.1
+NUM_EPOCHS = 25
 
 
 def _transform_data(df):
@@ -51,36 +63,36 @@ def _transform_data(df):
     # Get summary statistics for data in the dataframe
     print(df.describe())
 
-    print("info")
-    print(df.info())
+    df["LogFare"] = np.log(df["Fare"] + 1)
+    df = df.drop("Fare", axis=1)
 
-    print("\n\nisna")
-    print(df.isna())
+    modes = df.mode().iloc[0]
+    df.fillna(modes, inplace=True)
 
-    df = df.dropna(subset=RAW_FEATURES + ['Survived'])
-    print('Data after dropping rows with missing data')
-    print(df.shape)
+    y = df["Survived"].values
+    X = df[MODEL_FEATURES]
 
-    y = df['Survived'].values
-    X = df[RAW_FEATURES]
-
-    col_transformer = ColumnTransformer([
-        ('onehot', OneHotEncoder(), ['Pclass', 'Sex', 'Embarked']),
-        ('normalize', MinMaxScaler(), ['Age', 'SibSp', 'Parch', 'Fare']),
-    ], remainder='passthrough')
+    col_transformer = ColumnTransformer(
+        [
+            ("onehot", OneHotEncoder(), ["Pclass", "Sex", "Embarked"]),
+            ("normalize", MinMaxScaler(), ["Age", "SibSp", "Parch"]),
+        ],
+        remainder="passthrough",
+    )
 
     X = col_transformer.fit_transform(X)
-    feature_names = col_transformer.get_feature_names_out(
-        input_features=RAW_FEATURES)
+    feature_names = col_transformer.get_feature_names_out(input_features=MODEL_FEATURES)
     X = pd.DataFrame(X, columns=feature_names)
 
-    return X, y
-    # return tensor(X.values).float(), tensor(y)
+    print("\nData after transforming")
+    print(X.describe())
+
+    return tensor(X.values).float(), tensor(y)
 
 
 def _mse_loss(y_pred, y_true):
     y_pred = y_pred.sigmoid()
-    return ((y_pred - y_true)**2).mean()
+    return ((y_pred - y_true) ** 2).mean()
 
 
 def _binary_cross_entropy_loss(y_pred, y_true):
@@ -109,7 +121,7 @@ def _train_epoch(params, lr, train_dl, valid_X, valid_y):
     for X_batch, y_batch in train_dl:
         y_pred = _simple_net(X_batch, *params)
         loss = _mse_loss(y_pred, y_batch)
-        #loss = _binary_cross_entropy_loss(y_pred, y_batch)
+        # loss = _binary_cross_entropy_loss(y_pred, y_batch)
         loss.backward()
         with torch.no_grad():
             for p in params:
@@ -118,35 +130,38 @@ def _train_epoch(params, lr, train_dl, valid_X, valid_y):
 
     y_pred_valid = _simple_net(valid_X, *params)
 
-    print('Epoch results:')
-    print(f'Validation loss: {_mse_loss(y_pred_valid, valid_y)}')
-    print(f'Validation accuracy: {_accuracy(y_pred_valid, valid_y)}')
-    print('---------')
+    print("Epoch results:")
+    print(f"Validation loss: {_mse_loss(y_pred_valid, valid_y)}")
+    print(f"Validation accuracy: {_accuracy(y_pred_valid, valid_y)}")
+    print("---------")
 
 
 def main():
-    train_df = pd.read_csv(TRAIN_DATA, index_col='PassengerId')
+    train_df = pd.read_csv(TRAIN_DATA, index_col="PassengerId")
     X, y = _transform_data(train_df)
 
     # learning note: jumping between pandas dataframes, numpy ndarrays, and torch tensors
     # is a bit messy/confusing
-    # X_train, X_test, y_train, y_test = map(tensor, train_test_split(
-        # X, y, test_size=0.2, random_state=RANDOM_SEED))
+    X_train, X_test, y_train, y_test = map(
+        tensor, train_test_split(X, y, test_size=0.2)
+    )
 
-    # ds_train = TensorDataset(X_train, y_train)
-    # sampler = RandomSampler(
-        # ds_train, generator=Generator().manual_seed(RANDOM_SEED))
-    # train_dl = DataLoader(ds_train, batch_size=BATCH_SIZE, sampler=sampler)
+    ds_train = TensorDataset(X_train, y_train)
+    sampler = RandomSampler(
+        ds_train, generator=Generator()
+    )  # .manual_seed(RANDOM_SEED))
+    train_dl = DataLoader(ds_train, batch_size=BATCH_SIZE, sampler=sampler)
 
-    # weights1 = _init_params((len(X_train[0]), NUM_HIDDEN_UNITS))
-    # bias1 = _init_params(NUM_HIDDEN_UNITS)
-    # weights2 = _init_params((NUM_HIDDEN_UNITS, 1))
-    # bias2 = _init_params(1)
+    weights1 = _init_params((len(X_train[0]), NUM_HIDDEN_UNITS))
+    bias1 = _init_params(NUM_HIDDEN_UNITS)
+    weights2 = _init_params((NUM_HIDDEN_UNITS, 1))
+    bias2 = _init_params(1)
 
-    # for _ in range(NUM_EPOCHS):
-        # _train_epoch((weights1, bias1, weights2, bias2),
-                     # LEARNING_RATE, train_dl, X_test, y_test)
+    for _ in range(NUM_EPOCHS):
+        _train_epoch(
+            (weights1, bias1, weights2, bias2), LEARNING_RATE, train_dl, X_test, y_test
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
